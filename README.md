@@ -10,7 +10,7 @@
 
 <br><br>
 
-**Click INSTALL → download `DirectDrop-Setup.exe` → run it → install on BOTH laptops.**
+**Click INSTALL → download `DirectDrop-Setup.exe` → open it → approve Windows permission → install. Repeat on BOTH laptops.**
 
 </div>
 
@@ -21,9 +21,10 @@
 ## ⭐ START HERE — Install on BOTH laptops
 
 1. Open this repo.
-2. Click Code -> Download ZIP and extract it.
-3. Double-click `00_INSTALL.bat`.
-4. Repeat on the second laptop.
+2. Click **INSTALL FOR WINDOWS** above.
+3. Open `DirectDrop-Setup.exe` when Windows finishes downloading it.
+4. Approve the Windows permission prompt and complete the Setup wizard.
+5. Repeat the installation on the second laptop.
 
 After installation: connect the supported USB4 / USB-network cable, DirectDrop detects the link, the GUI opens, and files can be dragged across automatically.
 
@@ -38,7 +39,7 @@ After installation: connect the supported USB4 / USB-network cable, DirectDrop d
 - Offline transfer over a supported local link
 - No browser, cloud upload, or manual IP entry in the normal workflow
 
-## Manual development
+## Development (for contributors)
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
