@@ -61,18 +61,23 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Dependency installation failed." }
 
     Write-Host "[4/5] Registering background agent..."
-    $Action = '"' + $VenvPythonW + '" "' + $RunPy + '" --agent'
-    schtasks.exe /Create /TN $TaskName /SC ONLOGON /TR $Action /F | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "Could not register the Windows startup task." }
+
+    # Task Scheduler API handles paths containing spaces correctly.
+    $action = New-ScheduledTaskAction -Execute $VenvPythonW -Argument ('"' + $RunPy + '" --agent') -WorkingDirectory $InstallDir
+    $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
+
+    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Principal $principal -Description "DirectDrop background file-transfer agent" -Force | Out-Null
 
     Write-Host "[5/5] Starting DirectDrop..."
-    Start-Process -FilePath $VenvPythonW -ArgumentList @($RunPy, "--agent") -WindowStyle Hidden
+    Start-Process -FilePath $VenvPythonW -ArgumentList @($RunPy, "--agent") -WorkingDirectory $InstallDir -WindowStyle Hidden
 
     Write-Host ""
     Write-Host "============================================"
     Write-Host " DirectDrop installation completed"
     Write-Host "============================================"
     Write-Host ""
+    Write-Host "Background agent is registered for Windows logon."
     Write-Host "Connect a supported USB-C/USB4 network link after installing on both laptops."
 }
 catch {
