@@ -11,6 +11,7 @@ permissions:
 jobs:
   windows-installer:
     runs-on: windows-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,7 +21,7 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install dependencies
+      - name: Install build dependencies
         shell: powershell
         run: |
           python -m pip install --upgrade pip
@@ -28,36 +29,41 @@ jobs:
 
       - name: Build GUI
         shell: powershell
-        run: pyinstaller --noconfirm --clean --onefile --windowed --name DirectDrop run.py
+        run: |
+          pyinstaller --noconfirm --clean --onefile --windowed --name DirectDrop run.py
 
       - name: Build background agent
         shell: powershell
-        run: pyinstaller --noconfirm --clean --onefile --windowed --name DirectDropAgent agent_entry.py
+        run: |
+          pyinstaller --noconfirm --clean --onefile --windowed --name DirectDropAgent agent_entry.py
 
-      - name: Assemble installer payload
+      - name: Install Inno Setup
         shell: powershell
         run: |
-          New-Item -ItemType Directory -Force payload | Out-Null
-          Copy-Item dist\DirectDrop.exe payload\DirectDrop.exe
-          Copy-Item dist\DirectDropAgent.exe payload\DirectDropAgent.exe
+          choco install innosetup -y --no-progress
 
-      - name: Build setup EXE
+      - name: Build native Windows installer
         shell: powershell
-        run: pyinstaller --noconfirm --clean --onefile --windowed --name DirectDrop-Setup --add-data "payload;payload" installer.py
+        run: |
+          & "C:Program Files (x86)Inno Setup 6ISCC.exe" installer.iss
 
-      - name: Upload build artifact
+      - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DirectDrop-Windows-Installer
-          path: dist/DirectDrop-Setup.exe
+          name: DirectDrop-Windows-Setup
+          path: output/DirectDrop-Setup.exe
 
-      - name: Publish latest release
+      - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.1.0
-          name: DirectDrop v0.1.0
-          body: DirectDrop Windows installer. Install on both laptops.
+          tag_name: v0.2.0
+          name: DirectDrop v0.2.0
+          body: |
+            DirectDrop Windows installer.
+            
+            Install DirectDrop on both laptops.
+            Connect a supported USB4 / USB-network link and use DirectDrop for offline transfer.
           make_latest: true
-          files: dist/DirectDrop-Setup.exe
+          files: output/DirectDrop-Setup.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
