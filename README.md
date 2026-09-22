@@ -1,3 +1,21 @@
+<div align="center">
+
+# 🚀 DirectDrop
+
+### 📦 One-click Windows installer
+
+<a href="https://github.com/shyamraj2143/laptopTolaptop_fileTransfer/raw/refs/heads/main/00_INSTALL.bat">
+  <img src="https://img.shields.io/badge/INSTALL%20FOR%20WINDOWS-00_INSTALL.bat-2ea44f?style=for-the-badge&logo=windows&logoColor=white" alt="Install DirectDrop for Windows">
+</a>
+
+<br><br>
+
+**Install this on BOTH laptops.**
+
+</div>
+
+---
+
 # 🚀 DirectDrop — Install & Run
 
 ## ⭐ START HERE — Install on BOTH laptops
