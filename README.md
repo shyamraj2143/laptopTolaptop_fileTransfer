@@ -2,15 +2,15 @@
 
 # 🚀 DirectDrop
 
-### 📦 One-click Windows installer (EXE)
+### 📦 One-click Windows installer package
 
-<a href="https://github.com/shyamraj2143/laptopTolaptop_fileTransfer/releases/latest/download/DirectDrop-Setup.exe">
+<a href="https://github.com/shyamraj2143/laptopTolaptop_fileTransfer/archive/refs/heads/main.zip">
   <img src="https://img.shields.io/badge/INSTALL%20FOR%20WINDOWS-00_INSTALL.bat-2ea44f?style=for-the-badge&logo=windows&logoColor=white" alt="Install DirectDrop for Windows">
 </a>
 
 <br><br>
 
-**Install this on BOTH laptops.**
+**Download → extract → double-click `00_INSTALL.bat` on BOTH laptops.**
 
 </div>
 
