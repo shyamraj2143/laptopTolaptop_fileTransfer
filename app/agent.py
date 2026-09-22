@@ -36,17 +36,24 @@ class DirectDropAgent:
                 return
             self.gui_open = True
 
-        root = Path(__file__).resolve().parent.parent
-        run_py = root / "run.py"
+        if getattr(sys, "frozen", False):
+            # Production packaged build: the agent executable sits next to the GUI.
+            executable = str(Path(sys.executable).with_name("DirectDrop.exe"))
+            command = [executable]
+            working_dir = str(Path(sys.executable).resolve().parent)
+        else:
+            root = Path(__file__).resolve().parent.parent
+            run_py = root / "run.py"
+            command = [sys.executable, str(run_py), "--gui"]
+            working_dir = str(root)
+
         env = os.environ.copy()
 
         try:
-            pythonw = Path(sys.executable).with_name("pythonw.exe")
-            executable = str(pythonw if pythonw.exists() else Path(sys.executable))
             flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
             process = subprocess.Popen(
-                [executable, str(run_py), "--gui"],
-                cwd=str(root),
+                command,
+                cwd=working_dir,
                 env=env,
                 creationflags=flags,
             )
