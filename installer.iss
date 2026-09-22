@@ -10,68 +10,35 @@ AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 DefaultDirName={localappdata}\DirectDrop
-DisableProgramGroupPage=yes
+DefaultGroupName=DirectDrop
 OutputDir=output
 OutputBaseFilename=DirectDrop-Setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-PrivilegesRequired=lowest
+PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64compatible
-UninstallDisplayName=DirectDrop
-SetupIconFile=
 Uninstallable=yes
 CloseApplications=no
+DisableProgramGroupPage=yes
 
 [Files]
 Source: "dist\DirectDrop.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "dist\DirectDropAgent.exe"; DestDir: "{app}"; Flags: ignoreversion
 
-[Dirs]
-Name: "{app}"
-
 [Icons]
 Name: "{autoprograms}\DirectDrop"; Filename: "{app}\DirectDrop.exe"
 Name: "{autodesktop}\DirectDrop"; Filename: "{app}\DirectDrop.exe"
+Name: "{userstartup}\DirectDrop Agent"; Filename: "{app}\DirectDropAgent.exe"; WorkingDir: "{app}"
 
 [Run]
-Filename: "{app}\DirectDropAgent.exe"; Parameters: ""; Description: "Start DirectDrop background agent"; Flags: nowait postinstall skipifsilent
+Filename: "netsh.exe"; Parameters: "advfirewall firewall add rule name=""DirectDrop TCP 8765"" dir=in action=allow protocol=TCP localport=8765 profile=private"; Flags: runhidden
+Filename: "netsh.exe"; Parameters: "advfirewall firewall add rule name=""DirectDrop UDP 8766"" dir=in action=allow protocol=UDP localport=8766 profile=private"; Flags: runhidden
+Filename: "{app}\DirectDropAgent.exe"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
-Filename: "schtasks.exe"; Parameters: "/End /TN \"DirectDrop Background Agent\""; Flags: runhidden
-Filename: "schtasks.exe"; Parameters: "/Delete /TN \"DirectDrop Background Agent\" /F"; Flags: runhidden
-Filename: "netsh.exe"; Parameters: "advfirewall firewall delete rule name=\"DirectDrop TCP 8765\""; Flags: runhidden
-Filename: "netsh.exe"; Parameters: "advfirewall firewall delete rule name=\"DirectDrop UDP 8766\""; Flags: runhidden
+Filename: "netsh.exe"; Parameters: "advfirewall firewall delete rule name=""DirectDrop TCP 8765"""; Flags: runhidden
+Filename: "netsh.exe"; Parameters: "advfirewall firewall delete rule name=""DirectDrop UDP 8766"""; Flags: runhidden
 
-[Code]
-procedure RegisterAgent;
-var
-  ResultCode: Integer;
-  Agent: string;
-  TaskName: string;
-  Command: string;
-begin
-  Agent := ExpandConstant('{app}\DirectDropAgent.exe');
-  TaskName := 'DirectDrop Background Agent';
-  Command := '/Create /F /TN "' + TaskName + '" /SC ONLOGON /TR ""' + Agent + '""';
-  Exec(ExpandConstant('{sys}\schtasks.exe'), Command, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-
-  Exec(ExpandConstant('{sys}\netsh.exe'),
-    'advfirewall firewall add rule name="DirectDrop TCP 8765" dir=in action=allow protocol=TCP localport=8765 profile=private',
-    '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-
-  Exec(ExpandConstant('{sys}\netsh.exe'),
-    'advfirewall firewall add rule name="DirectDrop UDP 8766" dir=in action=allow protocol=UDP localport=8766 profile=private',
-    '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-end;
-
-procedure CurStepChanged(CurStep: TSetupStep);
-var
-  ResultCode: Integer;
-begin
-  if CurStep = ssPostInstall then
-  begin
-    RegisterAgent;
-    Exec(ExpandConstant('{app}\DirectDropAgent.exe'), '', ExpandConstant('{app}'), SW_HIDE, ewNoWait, ResultCode);
-  end;
-end;
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}"
