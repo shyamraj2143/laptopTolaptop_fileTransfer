@@ -2,9 +2,9 @@
 
 # 🚀 DirectDrop
 
-### 📦 One-click Windows installer
+### 📦 One-click Windows installer (EXE)
 
-<a href="https://github.com/shyamraj2143/laptopTolaptop_fileTransfer/raw/refs/heads/main/00_INSTALL.bat">
+<a href="https://github.com/shyamraj2143/laptopTolaptop_fileTransfer/releases/latest/download/DirectDrop-Setup.exe">
   <img src="https://img.shields.io/badge/INSTALL%20FOR%20WINDOWS-00_INSTALL.bat-2ea44f?style=for-the-badge&logo=windows&logoColor=white" alt="Install DirectDrop for Windows">
 </a>
 
