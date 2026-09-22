@@ -1,83 +1,159 @@
 from __future__ import annotations
+
+import os
 import threading
 from pathlib import Path
+
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QApplication,QFileDialog,QHBoxLayout,QLabel,QLineEdit,QListWidget,QMainWindow,QMessageBox,QProgressBar,QPushButton,QVBoxLayout,QWidget
-from app.main import send_file,start_receiver
+from PySide6.QtWidgets import (
+    QApplication, QFileDialog, QLabel, QListWidget, QMainWindow,
+    QMessageBox, QProgressBar, QPushButton, QVBoxLayout, QWidget
+)
+
+from app.discovery import DiscoveryService, Peer
+from app.main import send_file, start_receiver
+
+PORT = 8765
+
 
 class DropArea(QListWidget):
-    files_dropped=Signal(list)
-    def __init__(self):
-        super().__init__(); self.setAcceptDrops(True); self.setMinimumHeight(160); self.addItem("Drop files here")
-    def dragEnterEvent(self,event):
-        if event.mimeData().hasUrls(): event.acceptProposedAction()
-    def dropEvent(self,event):
-        paths=[u.toLocalFile() for u in event.mimeData().urls() if u.isLocalFile()]
+    files_dropped = Signal(list)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.setAcceptDrops(True)
+        self.setMinimumHeight(220)
+        self.addItem("Drag & drop files here")
+
+    def dragEnterEvent(self, event) -> None:
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event) -> None:
+        paths = [
+            url.toLocalFile()
+            for url in event.mimeData().urls()
+            if url.isLocalFile()
+        ]
         if paths:
-            self.files_dropped.emit(paths); event.acceptProposedAction()
+            self.files_dropped.emit(paths)
+            event.acceptProposedAction()
+
 
 class MainWindow(QMainWindow):
-    rx=Signal(str,int,int); tx=Signal(int,int); status=Signal(str); done=Signal(str)
-    def __init__(self):
-        super().__init__(); self.setWindowTitle("DirectDrop"); self.resize(760,560); self.server=None
-        self.receive_dir=Path.home()/"DirectDrop"/"Received"; self.receive_dir.mkdir(parents=True,exist_ok=True)
-        root=QWidget(); box=QVBoxLayout(root)
-        t=QLabel("DirectDrop"); t.setStyleSheet("font-size:28px;font-weight:700;"); box.addWidget(t)
-        box.addWidget(QLabel("Offline laptop-to-laptop file transfer. Transport is independent of the physical link."))
-        row=QHBoxLayout(); row.addWidget(QLabel("Listen port"))
-        self.listen=QLineEdit("8765"); self.listen.setMaximumWidth(90); row.addWidget(self.listen)
-        self.start_btn=QPushButton("Start Receiver"); self.start_btn.clicked.connect(self.start_receiver); row.addWidget(self.start_btn); row.addStretch(); box.addLayout(row)
-        row2=QHBoxLayout(); row2.addWidget(QLabel("Peer IP"))
-        self.peer=QLineEdit(); self.peer.setPlaceholderText("192.168.x.x"); row2.addWidget(self.peer)
-        row2.addWidget(QLabel("Port")); self.peer_port=QLineEdit("8765"); self.peer_port.setMaximumWidth(90); row2.addWidget(self.peer_port)
-        choose=QPushButton("Choose Files"); choose.clicked.connect(self.choose); row2.addWidget(choose); box.addLayout(row2)
-        self.drop=DropArea(); self.drop.files_dropped.connect(self.send_paths); box.addWidget(self.drop)
-        self.progress=QProgressBar(); box.addWidget(self.progress)
-        self.label=QLabel("Receiver not started"); box.addWidget(self.label)
-        box.addWidget(QLabel("Received files: "+str(self.receive_dir)))
-        self.rx.connect(self.on_rx); self.tx.connect(self.on_tx); self.status.connect(self.label.setText)
-        self.done.connect(self.on_done); self.setCentralWidget(root)
+    peer_found = Signal(str, str, int)
+    progress_changed = Signal(int)
+    status_changed = Signal(str)
 
-    def start_receiver(self):
+    def __init__(self) -> None:
+        super().__init__()
+        self.setWindowTitle("DirectDrop")
+        self.resize(720, 520)
+
+        self.peer_host = os.getenv("DIRECTDROP_PEER_IP", "")
+        self.peer_port = int(os.getenv("DIRECTDROP_PEER_PORT", str(PORT)))
+        self.discovery: DiscoveryService | None = None
+        self.receiver = None
+
+        self.receive_dir = Path.home() / "DirectDrop" / "Received"
+        self.receive_dir.mkdir(parents=True, exist_ok=True)
+
+        root = QWidget()
+        layout = QVBoxLayout(root)
+
+        title = QLabel("DirectDrop")
+        title.setStyleSheet("font-size: 30px; font-weight: 700;")
+        layout.addWidget(title)
+
+        self.connection = QLabel("Waiting for another DirectDrop laptop…")
+        self.connection.setStyleSheet("font-size: 16px;")
+        layout.addWidget(self.connection)
+
+        self.drop = DropArea()
+        self.drop.files_dropped.connect(self.send_paths)
+        layout.addWidget(self.drop)
+
+        self.choose = QPushButton("Choose Files")
+        self.choose.clicked.connect(self.choose_files)
+        layout.addWidget(self.choose)
+
+        self.progress = QProgressBar()
+        layout.addWidget(self.progress)
+
+        self.status = QLabel("Files received here: " + str(self.receive_dir))
+        self.status.setWordWrap(True)
+        layout.addWidget(self.status)
+
+        self.peer_found.connect(self.on_peer_found)
+        self.progress_changed.connect(self.progress.setValue)
+        self.status_changed.connect(self.status.setText)
+
+        self.setCentralWidget(root)
+        self.start_local_receiver()
+        self.start_discovery()
+
+        if self.peer_host:
+            self.on_peer_found("Peer", self.peer_host, self.peer_port)
+
+    def start_local_receiver(self) -> None:
         try:
-            port=int(self.listen.text()); assert 1<=port<=65535
-            self.server=start_receiver("0.0.0.0",port,self.receive_dir,on_progress=lambda n,r,t:self.rx.emit(n,r,t),on_complete=lambda p:self.done.emit(str(p)))
-            self.start_btn.setEnabled(False); self.label.setText(f"Listening on {port}")
-        except Exception as e:
-            QMessageBox.critical(self,"Receiver error",str(e))
+            self.receiver = start_receiver("0.0.0.0", PORT, self.receive_dir)
+        except OSError:
+            # The background agent may already own the port.
+            self.receiver = None
 
-    def choose(self):
-        files,_=QFileDialog.getOpenFileNames(self,"Select files"); self.send_paths(files)
+    def start_discovery(self) -> None:
+        self.discovery = DiscoveryService(on_peer=self._peer_callback)
+        self.discovery.start()
 
-    def send_paths(self,paths):
-        host=self.peer.text().strip()
-        try:
-            port=int(self.peer_port.text()); assert 1<=port<=65535
-        except Exception:
-            QMessageBox.warning(self,"Invalid port","Enter a valid port."); return
-        if not host:
-            QMessageBox.warning(self,"Peer IP required","Enter the receiving laptop IP."); return
+    def _peer_callback(self, peer: Peer) -> None:
+        self.peer_found.emit(peer.name, peer.host, peer.port)
+
+    def on_peer_found(self, name: str, host: str, port: int) -> None:
+        self.peer_host = host
+        self.peer_port = port
+        self.connection.setText(f"🟢 Connected: {name} ({host})")
+
+    def choose_files(self) -> None:
+        files, _ = QFileDialog.getOpenFileNames(self, "Select files")
+        self.send_paths(files)
+
+    def send_paths(self, paths: list[str]) -> None:
+        if not self.peer_host:
+            QMessageBox.information(
+                self,
+                "No laptop connected",
+                "Connect the other DirectDrop laptop first.",
+            )
+            return
+
         for raw in paths:
-            p=Path(raw)
-            if p.is_file():
-                threading.Thread(target=self._send,args=(host,port,p),daemon=True).start()
+            path = Path(raw)
+            if path.is_file():
+                threading.Thread(
+                    target=self._send_one,
+                    args=(path,),
+                    daemon=True,
+                ).start()
 
-    def _send(self,host,port,path):
+    def _send_one(self, path: Path) -> None:
         try:
-            self.status.emit("Sending: "+path.name)
-            send_file(host,port,path,lambda s,t:self.tx.emit(s,t))
-            self.status.emit("Sent: "+path.name)
-        except Exception as e:
-            self.status.emit(f"Send failed: {path.name} — {e}")
+            self.status_changed.emit(f"Sending {path.name}…")
+            send_file(
+                self.peer_host,
+                self.peer_port,
+                path,
+                progress=lambda sent, total: self.progress_changed.emit(
+                    int(sent * 100 / total) if total else 0
+                ),
+            )
+            self.status_changed.emit(f"Sent: {path.name}")
+        except Exception as exc:
+            self.status_changed.emit(f"Transfer failed: {path.name} — {exc}")
 
-    def on_rx(self,name,received,total):
-        self.progress.setValue(int(received*100/total) if total else 0); self.label.setText("Receiving: "+name)
 
-    def on_tx(self,sent,total):
-        self.progress.setValue(int(sent*100/total) if total else 0)
-
-    def on_done(self,path):
-        self.progress.setValue(100); self.label.setText("Received: "+Path(path).name)
-
-def run():
-    app=QApplication([]); w=MainWindow(); w.show(); app.exec()
+def run() -> None:
+    app = QApplication([])
+    window = MainWindow()
+    window.show()
+    app.exec()
