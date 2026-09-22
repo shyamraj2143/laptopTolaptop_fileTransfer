@@ -1,0 +1,56 @@
+name: Build and publish Windows installer
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install build dependencies
+        shell: powershell
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+
+      - name: Build GUI
+        shell: powershell
+        run: |
+          pyinstaller --noconfirm --clean --onefile --windowed --name DirectDrop run.py
+
+      - name: Build background agent
+        shell: powershell
+        run: |
+          pyinstaller --noconfirm --clean --onefile --windowed --name DirectDropAgent agent_entry.py
+
+      - name: Build installer
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force payload | Out-Null
+          Copy-Item dist\DirectDrop.exe payload\DirectDrop.exe
+          Copy-Item dist\DirectDropAgent.exe payload\DirectDropAgent.exe
+          pyinstaller --noconfirm --clean --onefile --windowed --name DirectDrop-Setup --add-data "payload;payload" installer.py
+
+      - name: Publish latest release
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if (gh release view latest --repo $env:GITHUB_REPOSITORY 2>$null) {
+            gh release upload latest dist\DirectDrop-Setup.exe --repo $env:GITHUB_REPOSITORY --clobber
+          } else {
+            gh release create latest dist\DirectDrop-Setup.exe --repo $env:GITHUB_REPOSITORY --title "DirectDrop Latest" --notes "Latest Windows self-contained installer for DirectDrop."
+          }
